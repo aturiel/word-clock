@@ -63,30 +63,28 @@ ESP8266WebServer server(WEBSERVER_PORT);
 ESP8266HTTPUpdateServer serverUpdater;
 
 static const char WEB_ACTIONS1[] PROGMEM = "<a class='w3-bar-item w3-button' href='/'><i class='fas fa-home'></i> Home</a>"
-    "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>";
-
-static const char WEB_ACTIONS2[] PROGMEM = "<a class='w3-bar-item w3-button' href='/pull'><i class='fas fa-cloud-download-alt'></i> Refresh Data</a>"
+    "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>"
+    "<a class='w3-bar-item w3-button' href='/pull'><i class='fas fa-cloud-download-alt'></i> Refresh Data</a>"
     "<a class='w3-bar-item w3-button' href='/display'>";
 
-static const char WEB_ACTION3[] PROGMEM = "</a><a class='w3-bar-item w3-button' href='#' onClick='confirm(\"Are you sure your want to reboot?\") && window.location.replace(\"/reboot\");'><i class='fas fa-power-off'></i> Reboot</a>"
+static const char WEB_ACTION2[] PROGMEM = "</a><a class='w3-bar-item w3-button' href='#' onClick='confirm(\"Are you sure your want to reboot?\") && window.location.replace(\"/reboot\");'><i class='fas fa-power-off'></i> Reboot</a>"
     "<a class='w3-bar-item w3-button' href='/systemreset' onclick='return confirm(\"Do you want to reset to default settings?\")'><i class='fas fa-undo'></i> Reset Settings</a>"
     "<a class='w3-bar-item w3-button' href='/forgetwifi' onclick='return confirm(\"Do you want to forget to WiFi connection?\")'><i class='fas fa-wifi'></i> Forget WiFi</a>"
     "<a class='w3-bar-item w3-button' href='/update'><i class='fas fa-wrench'></i> Firmware Update</a>";
 //                     "<a class='w3-bar-item w3-button' href='https://github.com/Qrome/marquee-scroller' target='_blank'><i class='fas fa-question-circle'></i> About</a>";
 //                     "<a class='w3-bar-item w3-button' href='/reboot'><i class='fas fa-power-off'></i> Reboot</a>"
 
-static const char CHANGE_FORM3[] PROGMEM = "<hr><p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
+static const char CHANGE_FORM[] PROGMEM = "<hr><p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
     "<p><label>Word-Clock User ID (for this web interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
     "<p><label>Word-Clock Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
     "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
     "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
-
 // Change the externalLight to the pin you wish to use if other than the Built-in LED
 int externalLight = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the Wemos
 
 // Which pin on the Arduino is connected to the NeoPixels?
-#define LED_PIN     D4
+#define LED_PIN    D4
 
 // How many NeoPixels are attached to the Arduino?
 #define LED_COUNT  64
@@ -97,15 +95,10 @@ int externalLight = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the We
 // NeoPixel library
 Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-int8_t nowHour;
-int8_t nowMinute;
-int8_t minuteRounded;
-int8_t hourCompensated;
+const int TOTAL_ROWS = 8;
+const int TOTAL_COLS = 8;
 
-int TOTAL_ROWS = 8;
-int TOTAL_COLS = 8;
-int display[8][8] = {0};
-char text[8][8] = {
+char text[TOTAL_ROWS][TOTAL_COLS] = {
   {'D', 'I', 'O', 'N', 'C', 'E', 'Z', 'S'},
   {'N', 'U', 'S', 'I', 'E', 'T', 'V', 'E'},
   {'C', 'I', 'N', 'O', 'C', 'H', 'O', 'I'},
@@ -115,6 +108,12 @@ char text[8][8] = {
   {'V', 'E', 'I', 'N', 'T', 'I', 'E', 'A'},
   {'D', 'C', 'I', 'N', 'E', 'Z', 'C', 'O'},
 };
+int display[TOTAL_ROWS][TOTAL_COLS] = {0};
+
+int8_t nowHour;
+int8_t nowMinute;
+int8_t minuteRounded;
+int8_t hourCompensated;
 
 //
 void setup() {
@@ -199,7 +198,7 @@ void setup() {
   }
 
   if (WEBSERVER_ENABLED) {
-    server.on("/", displayHomeData);
+    server.on("/", handleHome);
     server.on("/pull", handlePull);
     server.on("/systemreset", handleSystemReset);
     server.on("/forgetwifi", handleForgetWifi);
@@ -286,7 +285,33 @@ void handlePull() {
   updateData();
 }
 
-void displayHomeData() {
+void handleSystemReset() {
+  if (!athentication()) {
+    return server.requestAuthentication();
+  }
+  
+  Serial.println("Reset System Configuration");
+  
+  if (SPIFFS.remove(CONFIG)) {
+    redirectHome();
+    ESP.restart();
+  }
+}
+
+void handleForgetWifi() {
+  if (!athentication()) {
+    return server.requestAuthentication();
+  }
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  redirectHome();
+  WiFiManager wifiManager;
+  wifiManager.resetSettings();
+  ESP.restart();
+}
+
+void handleHome() {
+  digitalWrite(externalLight, LOW);
   String html = "";
 
   server.sendHeader("Cache-Control", "no-cache, no-store");
@@ -313,31 +338,6 @@ void displayHomeData() {
   digitalWrite(externalLight, HIGH);
 }
 
-void handleSystemReset() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  
-  Serial.println("Reset System Configuration");
-  
-  if (SPIFFS.remove(CONFIG)) {
-    redirectHome();
-    ESP.restart();
-  }
-}
-
-void handleForgetWifi() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  redirectHome();
-  WiFiManager wifiManager;
-  wifiManager.resetSettings();
-  ESP.restart();
-}
-
 void handleConfigure() {
   if (!athentication()) {
     return server.requestAuthentication();
@@ -353,7 +353,7 @@ void handleConfigure() {
 
   sendHeader();
 
-  String form = FPSTR(CHANGE_FORM3);
+  String form = FPSTR(CHANGE_FORM);
 
   String isUseSecurityChecked = "";
   if (IS_BASIC_AUTH) {
@@ -366,13 +366,13 @@ void handleConfigure() {
   server.sendContent(form); // Send the second chunk of Data
 
   sendFooter();
-
   server.sendContent("");
   server.client().stop();
   digitalWrite(externalLight, HIGH);
 }
 
 void handleReboot() {
+  redirectHome();
   ESP.restart();
 }
 
@@ -381,9 +381,9 @@ void handleDisplay() {
     return server.requestAuthentication();
   }
   enableDisplay(!displayOn);
+  redirectHome();
 }
 
-//***********************************************************************
 void updateData() {
   Serial.println("Updating Time...");
   timeClient.update();
@@ -394,7 +394,6 @@ void updateData() {
     firstEpoch = now();
     Serial.println("firstEpoch is: " + String(firstEpoch));
   }
-
 }
 
 void redirectHome() {
@@ -430,13 +429,12 @@ void sendHeader() {
   server.sendContent(html);
 
   server.sendContent(FPSTR(WEB_ACTIONS1));
-  server.sendContent(FPSTR(WEB_ACTIONS2));
   if (displayOn) {
     server.sendContent("<i class='fas fa-eye-slash'></i> Turn Display OFF");
   } else {
     server.sendContent("<i class='fas fa-eye'></i> Turn Display ON");
   }
-  server.sendContent(FPSTR(WEB_ACTION3));
+  server.sendContent(FPSTR(WEB_ACTION2));
 
   html = "</nav>";
   html += "<header class='w3-top w3-bar w3-theme'><button class='w3-bar-item w3-button w3-xxxlarge w3-hover-theme' onclick='openSidebar()'><i class='fas fa-bars'></i></button><h2 class='w3-bar-item'>Word-Clock</h2></header>";
@@ -615,7 +613,6 @@ void colorWipe(uint32_t color, int wait) {
   }
 }
 
-
 void rainbow(uint8_t wait) {
   uint16_t i, j;
   for (j = 0; j < 256; j++) {
@@ -642,6 +639,7 @@ uint32_t Wheel(byte WheelPos) {
   return leds.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
+//
 void displayWordTime() {
   // Reset array to zeroes
   for (int8_t row = 0; row < TOTAL_ROWS; row++) {
