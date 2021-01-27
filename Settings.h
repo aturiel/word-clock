@@ -62,11 +62,6 @@ boolean IS_BASIC_AUTH = false;  // Use Basic Authorization for Configuration sec
 char* www_username = "admin";  // User account for the Web Interface
 char* www_password = "WJ8>9n#9Fz9";  // Password for the Web Interface
 
-long utcOffsetInSeconds = 3600;
-
-
-int minutesBetweenDataRefresh = 1440;  // Time in minutes between data refresh (default 1440 minutes)
-
 String timeDisplayTurnsOn = "";  // 24 Hour Format HH:MM -- Leave blank for always on. (ie 05:30)
 String timeDisplayTurnsOff = ""; // 24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work.
 

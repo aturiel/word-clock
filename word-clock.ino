@@ -26,22 +26,25 @@
 ***********************************************/
 
 #include "Settings.h"
-#define VERSION "2.15"
+#define VERSION "1.0"
 
 #define HOSTNAME "WORD-CLOCK-"
 #define CONFIG "/conf.txt"
 #define BUZZER_PIN  D5
 
 /* Useful Constants */
+/*
 #define SECS_PER_MIN  (60UL)
 #define SECS_PER_HOUR (3600UL)
 #define SECS_PER_DAY  (SECS_PER_HOUR * 24L)
-
+*/
 /* Useful Macros for getting elapsed time */
+/*
 #define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)
 #define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN)
 #define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
 #define elapsedDays(_time_) ( _time_ / SECS_PER_DAY)
+*/
 
 //declairing prototypes
 void configModeCallback (WiFiManager *myWiFiManager);
@@ -49,14 +52,16 @@ int8_t getWifiQuality();
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
+long utcOffsetInSeconds = 3600;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
+// HTML to simulate word-clock
 String wordClockSimulated = "";
-//
-long lastEpoch = 0;
-long firstEpoch = 0;
 
-long displayOffEpoch = 0;
+//
+int displayedHour = 0;
+int displayedMinutes = 0;
+
 boolean displayOn = true;
 
 ESP8266WebServer server(WEBSERVER_PORT);
@@ -64,7 +69,6 @@ ESP8266HTTPUpdateServer serverUpdater;
 
 static const char WEB_ACTIONS1[] PROGMEM = "<a class='w3-bar-item w3-button' href='/'><i class='fas fa-home'></i> Home</a>"
     "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>"
-    "<a class='w3-bar-item w3-button' href='/pull'><i class='fas fa-cloud-download-alt'></i> Refresh Data</a>"
     "<a class='w3-bar-item w3-button' href='/display'>";
 
 static const char WEB_ACTION2[] PROGMEM = "</a><a class='w3-bar-item w3-button' href='#' onClick='confirm(\"Are you sure your want to reboot?\") && window.location.replace(\"/reboot\");'><i class='fas fa-power-off'></i> Reboot</a>"
@@ -74,9 +78,14 @@ static const char WEB_ACTION2[] PROGMEM = "</a><a class='w3-bar-item w3-button' 
 //                     "<a class='w3-bar-item w3-button' href='https://github.com/Qrome/marquee-scroller' target='_blank'><i class='fas fa-question-circle'></i> About</a>";
 //                     "<a class='w3-bar-item w3-button' href='/reboot'><i class='fas fa-power-off'></i> Reboot</a>"
 
-static const char CHANGE_FORM[] PROGMEM = "<hr><p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
+static const char CHANGE_FORM[] PROGMEM = "<form class='w3-container' action='/saveconfig' method='get'><h2>Configure:</h2>"
+    "<hr>"
+    "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
     "<p><label>Word-Clock User ID (for this web interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
-    "<p><label>Word-Clock Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
+    "<p><label>Word-Clock Password</label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
+    "<hr>"
+    "<p><label>Display OFF Time (24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work)</label><input class='w3-input w3-border w3-margin-bottom' name='endTime' type='time' value='%ENDTIME%'></p>"
+    "<p><label>Display ON Time (24 Hour Format HH:MM -- Leave blank for always on)</label><input class='w3-input w3-border w3-margin-bottom' name='startTime' type='time' value='%STARTTIME%'></p>"
     "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
     "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
@@ -117,16 +126,19 @@ int8_t hourCompensated;
 
 //
 void setup() {
+  Serial.begin (115200);
+  SPIFFS.begin();
+
   // Initialize digital pin for LED
   pinMode(externalLight, OUTPUT);
   digitalWrite (externalLight, HIGH); // Switch off LED
+
+  //loadConfig();
 
   // Init leds to turn off
   leds.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
   leds.show(); // Turn OFF all pixels ASAP
   leds.setBrightness(BRIGHTNESS);
-
-  Serial.begin (115200);
 
   //New Line to clear from start garbage
   Serial.println();
@@ -199,10 +211,10 @@ void setup() {
 
   if (WEBSERVER_ENABLED) {
     server.on("/", handleHome);
-    server.on("/pull", handlePull);
     server.on("/systemreset", handleSystemReset);
     server.on("/forgetwifi", handleForgetWifi);
     server.on("/configure", handleConfigure);
+    server.on("/saveconfig", processConfig);
     server.on("/display", handleDisplay);
     server.on("/reboot", handleReboot);
     server.onNotFound(redirectHome);
@@ -226,42 +238,47 @@ void setup() {
 //************************************************************
 void loop() {
 
-  static int last = 0;
+  timeClient.update();
 
-  //Get some updated data to serve
-  if ((getMinutesFromLastRefresh() >= minutesBetweenDataRefresh) || lastEpoch == 0) {
-    updateData();
-  }
-
+  //
   checkDisplay(); // this will see if we need to turn it on or off for night mode.
 
-  if ((millis() - last) > 5000) {
-    last = millis();
-    nowHour = timeClient.getHours() % 12;
-    nowMinute = timeClient.getMinutes();
-    //daysOfTheWeek[timeClient.getDay()]);
-    //timeClient.getSeconds());
+  // calculate word-time
+  nowHour = timeClient.getHours() % 12;
+  nowMinute = timeClient.getMinutes();
+  //daysOfTheWeek[timeClient.getDay()]);
+  //timeClient.getSeconds());
 
-    // round minutes always to five minutes after
-    int roundMinutes = nowMinute % 5;
-    if ( roundMinutes != 0) {
-      if (roundMinutes > 2) {
-        roundMinutes = 5 - roundMinutes;
-      } else {
-        roundMinutes *= -1;
-      }
-    }
-    minuteRounded = nowMinute + roundMinutes;
-
-    if (minuteRounded > 30) {
-      hourCompensated = (nowHour + 1) % 12;
+  // round minutes to five minutes after if remainder > 2
+  int roundMinutes = nowMinute % 5;
+  if ( roundMinutes != 0) {
+    if (roundMinutes > 2) {
+      roundMinutes = 5 - roundMinutes;
     } else {
-      hourCompensated = nowHour;
+      roundMinutes *= -1;
     }
+  }
+  minuteRounded = nowMinute + roundMinutes;
 
-    if(displayOn) {
+  if (minuteRounded > 30) {
+    hourCompensated = (nowHour + 1) % 12;
+  } else {
+    hourCompensated = nowHour;
+  }
+
+  if (displayOn) {
+    // only when hour changes
+    //if(displayedHour != hourCompensated || displayedMinutes != minuteRounded) {
+      //displayedHour = hourCompensated;
+      //displayedMinutes = minuteRounded;
+    // change every minute
+    if( displayedMinutes != nowMinute) {
+      displayedMinutes = nowMinute;
       displayWordTime();
     }
+  } else {
+    displayedHour = -1;
+    displayedMinutes = -1;
   }
 
   //
@@ -269,9 +286,85 @@ void loop() {
     server.handleClient();
   }
 
+  //
   if (ENABLE_OTA) {
     ArduinoOTA.handle();
   }
+
+  delay(1000);
+}
+
+void loadConfig() {
+  if (SPIFFS.exists(CONFIG) == false) {
+    Serial.println("Settings File does not yet exists.");
+    saveConfig();
+    return;
+  }
+  File fr = SPIFFS.open(CONFIG, "r");
+  String line;
+  while (fr.available()) {
+    line = fr.readStringUntil('\n');
+    if (line.indexOf("timeDisplayTurnsOn=") >= 0) {
+      timeDisplayTurnsOn = line.substring(line.lastIndexOf("timeDisplayTurnsOn=") + 19);
+      timeDisplayTurnsOn.trim();
+      Serial.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
+    }
+    if (line.indexOf("timeDisplayTurnsOff=") >= 0) {
+      timeDisplayTurnsOff = line.substring(line.lastIndexOf("timeDisplayTurnsOff=") + 20);
+      timeDisplayTurnsOff.trim();
+      Serial.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
+    }
+    if (line.indexOf("www_username=") >= 0) {
+      String temp = line.substring(line.lastIndexOf("www_username=") + 13);
+      temp.trim();
+      temp.toCharArray(www_username, sizeof(temp));
+      Serial.println("www_username=" + String(www_username));
+    }
+    if (line.indexOf("www_password=") >= 0) {
+      String temp = line.substring(line.lastIndexOf("www_password=") + 13);
+      temp.trim();
+      temp.toCharArray(www_password, sizeof(temp));
+      Serial.println("www_password=" + String(www_password));
+    }
+    if (line.indexOf("IS_BASIC_AUTH=") >= 0) {
+      IS_BASIC_AUTH = line.substring(line.lastIndexOf("IS_BASIC_AUTH=") + 14).toInt();
+      Serial.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
+    }
+  }
+  fr.close();
+}
+
+void saveConfig() {
+  // Save decoded message to SPIFFS file for playback on power up.
+  File f = SPIFFS.open(CONFIG, "w");
+  if (!f) {
+    Serial.println("File open failed!");
+  } else {
+    Serial.println("Saving settings now...");
+    f.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
+    f.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
+    f.println("www_username=" + String(www_username));
+    f.println("www_password=" + String(www_password));
+    f.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
+  }
+  f.close();
+  loadConfig();
+}
+
+void processConfig() {
+  if (!athentication()) {
+    return server.requestAuthentication();
+  }
+  timeDisplayTurnsOn = decodeHtmlString(server.arg("startTime"));
+  timeDisplayTurnsOff = decodeHtmlString(server.arg("endTime"));
+  IS_BASIC_AUTH = server.hasArg("isBasicAuth");
+  String temp = server.arg("userid");
+  temp.toCharArray(www_username, sizeof(temp));
+  temp = server.arg("stationpassword");
+  temp.toCharArray(www_password, sizeof(temp));
+
+  saveConfig();
+  redirectHome();
 }
 
 boolean athentication() {
@@ -281,17 +374,13 @@ boolean athentication() {
   return true; // Authentication not required
 }
 
-void handlePull() {
-  updateData();
-}
-
 void handleSystemReset() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
-  
+
   Serial.println("Reset System Configuration");
-  
+
   if (SPIFFS.remove(CONFIG)) {
     redirectHome();
     ESP.restart();
@@ -321,12 +410,15 @@ void handleHome() {
   server.send(200, "text/html", "");
   sendHeader();
 
-  Serial.println(timeClient.getFormattedTime());
+  if(displayOn) {
+    html += "<p> Display ON</p>";
+  } else {
+    html += "<p> Display OFF</p>";
+  }
   html += "<p>" + timeClient.getFormattedTime() + "</p>";
-
   html += "<p>" + String(nowHour) + ":" + String(nowMinute) + "</p>";
-  html += "<p> rounded minute " + String(minuteRounded) + "</p>";
-  html += "<p> compensated hour " + String(hourCompensated) + "</p>";
+  html += "<p> compensated hour: " + String(hourCompensated);
+  html += " rounded minute: " + String(minuteRounded) + "</p>";
   html += "<hr>";
   html += "<code>" + wordClockSimulated + "</code>";
 
@@ -355,6 +447,7 @@ void handleConfigure() {
 
   String form = FPSTR(CHANGE_FORM);
 
+  // Auth
   String isUseSecurityChecked = "";
   if (IS_BASIC_AUTH) {
     isUseSecurityChecked = "checked='checked'";
@@ -363,6 +456,11 @@ void handleConfigure() {
   form.replace("%USERID%", String(www_username));
   form.replace("%STATIONPASSWORD%", String(www_password));
 
+  // Time Display on/off
+  form.replace("%STARTTIME%", timeDisplayTurnsOn);
+  form.replace("%ENDTIME%", timeDisplayTurnsOff);
+
+  //
   server.sendContent(form); // Send the second chunk of Data
 
   sendFooter();
@@ -382,18 +480,6 @@ void handleDisplay() {
   }
   enableDisplay(!displayOn);
   redirectHome();
-}
-
-void updateData() {
-  Serial.println("Updating Time...");
-  timeClient.update();
-
-  lastEpoch = now();
-  
-  if (firstEpoch == 0) {
-    firstEpoch = now();
-    Serial.println("firstEpoch is: " + String(firstEpoch));
-  }
 }
 
 void redirectHome() {
@@ -417,7 +503,7 @@ void sendHeader() {
   html += "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.1/css/all.min.css'>";
   html += "<style>";
   html += "div.word-clock {text-align: center;}";
-  html += "span.letter {font:'monospaced'; font-size: 150%; color:lightgrey; padding: 2px 4px;}";
+  html += "span.letter {font:'monospaced'; font-size: 150%; color:lightgrey; padding: 0px 8px;}";
   html += "span.selected {font-weight: bold; color:black;}";
   html += "</style>";
   html += "</head><body>";
@@ -453,8 +539,7 @@ void sendFooter() {
   String html = "<br><br><br>";
   html += "</div>";
   html += "<footer class='w3-container w3-bottom w3-theme w3-margin-top'>";
-  html += "<i class='far fa-paper-plane'></i> Version: " + String(VERSION) + "<br>";
-  html += "<i class='far fa-clock'></i> Next Update: " + getTimeTillUpdate() + "<br>";
+  html += "<i class='far fa-paper-plane'></i> Version: " + String(VERSION) + " · ";
   html += "<i class='fas fa-rss'></i> Signal Strength: ";
   html += String(rssi) + "%";
   html += "</footer>";
@@ -496,70 +581,34 @@ int8_t getWifiQuality() {
   }
 }
 
-String getTimeTillUpdate() {
-  String rtnValue = "";
-
-  long timeToUpdate = (((minutesBetweenDataRefresh * 60) + lastEpoch) - now());
-
-  int hours = numberOfHours(timeToUpdate);
-  int minutes = numberOfMinutes(timeToUpdate);
-  int seconds = numberOfSeconds(timeToUpdate);
-
-  rtnValue += String(hours) + ":";
-  if (minutes < 10) {
-    rtnValue += "0";
-  }
-  rtnValue += String(minutes) + ":";
-  if (seconds < 10) {
-    rtnValue += "0";
-  }
-  rtnValue += String(seconds);
-
-  return rtnValue;
-}
-
-int getMinutesFromLastRefresh() {
-  int minutes = (now() - lastEpoch) / 60;
-  return minutes;
-}
-
-int getMinutesFromLastDisplay() {
-  int minutes = (now() - displayOffEpoch) / 60;
-  return minutes;
-}
-
 void enableDisplay(boolean enable) {
   displayOn = enable;
+
   if (enable) {
-    if (getMinutesFromLastDisplay() >= minutesBetweenDataRefresh) {
-      // The display has been off longer than the minutes between refresh -- need to get fresh data
-      lastEpoch = 0; // this should force a data pull
-      displayOffEpoch = 0;  // reset
-    }
-    //matrix.shutdown(false);
-    Serial.println("Display was turned ON: " + now());
+    Serial.println("Display was turned ON");
   } else {
-    //matrix.shutdown(true);
-    Serial.println("Display was turned OFF: " + now());
-    displayOffEpoch = lastEpoch;
+    Serial.println("Display was turned OFF");
+    colorWipe(leds.Color( 0, 0, 0, 0), 10);
   }
 }
 
 // Toggle on and off the display if user defined times
 void checkDisplay() {
-  if (timeDisplayTurnsOn == "" || timeDisplayTurnsOff == "") {
+  if (timeDisplayTurnsOn.length() == 0 || timeDisplayTurnsOff.length() == 0) {
     return; // nothing to do
   }
 
-  String currentTime = String(nowHour) + ":" + String(nowMinute);
+  // get current time in HH:MM (not rounded for word-clock)
+  //String currentTime = String(timeClient.getHours()) + ":" + String(timeClient.getMinutes());
+  String currentTime = timeClient.getFormattedTime();
 
-  if (currentTime == timeDisplayTurnsOn && !displayOn) {
+  if (currentTime.startsWith(timeDisplayTurnsOn) && !displayOn) {
     Serial.println("Time to turn display on: " + currentTime);
     flashLED(1, 500);
     enableDisplay(true);
   }
 
-  if (currentTime == timeDisplayTurnsOff && displayOn) {
+  if (currentTime.startsWith(timeDisplayTurnsOff) && displayOn) {
     Serial.println("Time to turn display off: " + currentTime);
     flashLED(2, 500);
     enableDisplay(false);
@@ -595,50 +644,6 @@ String decodeHtmlString(String msg) {
   return decodedMsg;
 }
 
-void ledsIntro() {
-  rainbow(15);
-  //colorWipe(leds.Color( 0, 0, 0, 0), 1);
-}
-
-// Fill strip pixels one after another with a color. Strip is NOT cleared
-// first; anything there will be covered pixel by pixel. Pass in color
-// (as a single 'packed' 32-bit value, which you can get by calling
-// leds.Color(red, green, blue) as shown in the loop() function above),
-// and a delay time (in milliseconds) between pixels.
-void colorWipe(uint32_t color, int wait) {
-  for (int i = 0; i < leds.numPixels(); i++) {  // For each pixel in leds...
-    leds.setPixelColor(i, color);               //  Set pixel's color (in RAM)
-    leds.show();                                //  Update strip to match
-    delay(wait);                                //  Pause for a moment
-  }
-}
-
-void rainbow(uint8_t wait) {
-  uint16_t i, j;
-  for (j = 0; j < 256; j++) {
-    for (i = 0; i < leds.numPixels(); i++) {
-      leds.setPixelColor(i, Wheel((i + j) & 255));
-    }
-    leds.show();
-    delay(wait);
-  }
-}
-
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if (WheelPos < 85) {
-    return leds.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if (WheelPos < 170) {
-    WheelPos -= 85;
-    return leds.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return leds.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-}
-
 //
 void displayWordTime() {
   // Reset array to zeroes
@@ -657,9 +662,9 @@ void displayWordTime() {
     display[3][2] = 1;
   } else if (hourCompensated == 2) {
     // "DOS"
-    display[3][0] = 1;
-    display[3][2] = 1;
-    display[3][7] = 1;
+    display[0][0] = 1;
+    display[0][2] = 1;
+    display[0][7] = 1;
   } else if (hourCompensated == 3) {
     // "TRES"
     display[3][3] = 1;
@@ -792,26 +797,107 @@ void displayWordTime() {
     display[7][7] = 1;
   }
 
-  wordClockSimulated = debugOutput();
-
+  //
+  wordClockSimulated = "<div class='word-clock'>";
+  int red, green, blue;
+  int rnd = random(50, 127);
   for (int8_t row = 0; row < TOTAL_ROWS; ++row) {
+    wordClockSimulated += "<div class='word-clock-row'>";
     for (int8_t col = 0; col < TOTAL_COLS; ++col) {
       if (display[row][col] == 1) {
-        // Dim LEDs between 11pm and 6am
-        //if (hour() >= 6 && hour() <= 22)
-          //leds.setPixelColor(row * TOTAL_COLS + col, 175, 175, 175);
-          int magicNumber = (row + col) *12 + nowHour*2 + nowMinute*2;
-          leds.setPixelColor(row * TOTAL_COLS + col, Wheel(magicNumber & 255));
-        //else
-          //leds.setPixelColor(row * TOTAL_COLS + col, 25, 25, 25);
-        //  leds.setPixelColor(row * TOTAL_COLS + col, Wheel((row + col + nowHour + nowMinute) & 255));
-        //}
+        int ledColor = WheelAlt(calculateMagicNumber(row, col, rnd), red, green, blue);
+        leds.setPixelColor(row * TOTAL_COLS + col, ledColor);
+        wordClockSimulated += "<span class='letter selected' style='color:" + htmlColor(red, green, blue) + "'>" + String(text[row][col]) + "</span>";
+      } else {
+        wordClockSimulated += "<span class='letter'>" + String(text[row][col]) + "</span>";
       }
     }
+    wordClockSimulated += "</div>";
   }
+  //
+  wordClockSimulated += "</div>";
+
+  //
   leds.show();
 }
 
+byte calculateMagicNumber(int row, int col, int rnd) {
+  int retValue = (row * TOTAL_COLS + col) * 2 + rnd;
+  return (retValue & 255);
+}
+
+String htmlColor(int red, int green, int blue) {
+  return "rgb(" + String(red) + "," + String(green) + "," +String(blue) + ")";
+}
+
+// LEDS...
+void ledsIntro() {
+  rainbow(15);
+  //colorWipe(leds.Color( 0, 0, 0, 0), 1);
+}
+
+// Fill strip pixels one after another with a color. Strip is NOT cleared
+// first; anything there will be covered pixel by pixel. Pass in color
+// (as a single 'packed' 32-bit value, which you can get by calling
+// leds.Color(red, green, blue) as shown in the loop() function above),
+// and a delay time (in milliseconds) between pixels.
+void colorWipe(uint32_t color, int wait) {
+  for (int i = 0; i < leds.numPixels(); i++) {  // For each pixel in leds...
+    leds.setPixelColor(i, color);               //  Set pixel's color (in RAM)
+    leds.show();                                //  Update strip to match
+    delay(wait);                                //  Pause for a moment
+  }
+}
+
+void rainbow(uint8_t wait) {
+  uint16_t i, j;
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < leds.numPixels(); i++) {
+      leds.setPixelColor(i, Wheel((i + j) & 255));
+    }
+    leds.show();
+    delay(wait);
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if (WheelPos < 85) {
+    return leds.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if (WheelPos < 170) {
+    WheelPos -= 85;
+    return leds.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return leds.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t WheelAlt(byte WheelPos, int &red, int &green, int &blue) {
+  WheelPos = 255 - WheelPos;
+  if (WheelPos < 85) {
+    red = 255 - WheelPos * 3;
+    green = 0;
+    blue = WheelPos * 3;
+  } else if (WheelPos < 170) {
+    WheelPos -= 85;
+    red = 0;
+    green = WheelPos * 3;
+    blue = 255 - WheelPos * 3;
+  } else {
+    WheelPos -= 170;
+    red = WheelPos * 3;
+    green = 255 - WheelPos * 3;
+    blue = 0;
+  }
+  return leds.Color(red, green, blue);
+}
+
+/*
 String debugOutput() {
   String result = "<div class='word-clock'>";
 
@@ -829,3 +915,4 @@ String debugOutput() {
   result += "</div>";
   return result;
 }
+*/
