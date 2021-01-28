@@ -55,18 +55,20 @@ SOFTWARE.
 // Start Settings
 //******************************
 
-//String TIMEDBKEY = "EWSHE36AKUNX"; // Your API Key from https://timezonedb.com/register
-const int WEBSERVER_PORT = 80; // The port you can access this device on over HTTP
-const boolean WEBSERVER_ENABLED = true;  // Device will provide a web interface via http://[ip]:[port]/
-boolean IS_BASIC_AUTH = false;  // Use Basic Authorization for Configuration security on Web Interface
-char* www_username = "admin";  // User account for the Web Interface
-char* www_password = "WJ8>9n#9Fz9";  // Password for the Web Interface
+//String TIMEDBKEY = "EWSHE36AKUNX";    // Your API Key from https://timezonedb.com/register
+const int WEBSERVER_PORT = 80;          // The port you can access this device on over HTTP
+const boolean WEBSERVER_ENABLED = true; // Device will provide a web interface via http://[ip]:[port]/
+boolean IS_BASIC_AUTH = false;          // Use Basic Authorization for Configuration security on Web Interface
+char* www_username = "admin";           // User account for the Web Interface
+char* www_password = "WJ8>9n#9Fz9";     // Password for the Web Interface
 
-String timeDisplayTurnsOn = "";  // 24 Hour Format HH:MM -- Leave blank for always on. (ie 05:30)
-String timeDisplayTurnsOff = ""; // 24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work.
+String timeDisplayTurnsOn = "";   // 24 Hour Format HH:MM -- Leave blank for always on. (ie 05:30)
+String timeDisplayTurnsOff = "";  // 24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work.
+boolean isRainbowHour = false;    // Display rainbow animation on the hour
+boolean isColorsPerMinute = true; // Update colors every minute
 
-boolean ENABLE_OTA = true;    // this will allow you to load firmware to the device over WiFi (see OTA for ESP8266)
-String OTA_Password = "";     // Set an OTA password here -- leave blank if you don't want to be prompted for password
+boolean ENABLE_OTA = true;  // this will allow you to load firmware to the device over WiFi (see OTA for ESP8266)
+String OTA_Password = "";   // Set an OTA password here -- leave blank if you don't want to be prompted for password
 
 //******************************
 // End Settings

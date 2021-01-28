@@ -59,9 +59,7 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 String wordClockSimulated = "";
 
 //
-int displayedHour = 0;
 int displayedMinutes = 0;
-
 boolean displayOn = true;
 
 ESP8266WebServer server(WEBSERVER_PORT);
@@ -78,14 +76,20 @@ static const char WEB_ACTION2[] PROGMEM = "</a><a class='w3-bar-item w3-button' 
 //                     "<a class='w3-bar-item w3-button' href='https://github.com/Qrome/marquee-scroller' target='_blank'><i class='fas fa-question-circle'></i> About</a>";
 //                     "<a class='w3-bar-item w3-button' href='/reboot'><i class='fas fa-power-off'></i> Reboot</a>"
 
-static const char CHANGE_FORM[] PROGMEM = "<form class='w3-container' action='/saveconfig' method='get'><h2>Configure:</h2>"
+static const char CHANGE_FORM[] PROGMEM = "<form class='w3-container' action='/saveconfig' method='get'><h2>Configure</h2>"
     "<hr>"
+    "<h3>Security</h3>"
     "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
     "<p><label>Word-Clock User ID (for this web interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
     "<p><label>Word-Clock Password</label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
     "<hr>"
+    "<h3>Night mode</h3>"
     "<p><label>Display OFF Time (24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work)</label><input class='w3-input w3-border w3-margin-bottom' name='endTime' type='time' value='%ENDTIME%'></p>"
     "<p><label>Display ON Time (24 Hour Format HH:MM -- Leave blank for always on)</label><input class='w3-input w3-border w3-margin-bottom' name='startTime' type='time' value='%STARTTIME%'></p>"
+    "<hr>"
+    "<h3>Colors</h3>"
+    "<p><input name='isRainbowHour' class='w3-check w3-margin-top' type='checkbox' %IS_RAINBOW_HOUR_CHECKED%> Display rainbow animation on the hour</p>"    
+    "<p><input name='isColorsPerMinute' class='w3-check w3-margin-top' type='checkbox' %IS_COLORS_PER_MINUTE%> Update colors every minute</p>"
     "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
     "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
@@ -124,6 +128,7 @@ int8_t nowMinute;
 int8_t minuteRounded;
 int8_t hourCompensated;
 
+int8_t lastRainbowHour;
 //
 void setup() {
   Serial.begin (115200);
@@ -133,15 +138,10 @@ void setup() {
   pinMode(externalLight, OUTPUT);
   digitalWrite (externalLight, HIGH); // Switch off LED
 
-  //loadConfig();
-
   // Init leds to turn off
   leds.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
   leds.show(); // Turn OFF all pixels ASAP
   leds.setBrightness(BRIGHTNESS);
-
-  //New Line to clear from start garbage
-  Serial.println();
 
   // start-up chime
   /*
@@ -155,7 +155,17 @@ void setup() {
   */
 
   ledsIntro();
-  leds.show(); // Turn OFF all pixels ASAP
+  leds.clear(); //   Set all pixels in RAM to 0 (off)
+  int ledRndPos = random(0, leds.numPixels());
+  leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
+  leds.show();
+
+  //New Line to clear from start garbage
+  Serial.println();
+
+  loadConfig();
+  leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
+  leds.show();
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -171,11 +181,17 @@ void setup() {
   String hostname(HOSTNAME);
   hostname += String(ESP.getChipId(), HEX);
   if (!wifiManager.autoConnect((const char *)hostname.c_str())) {// new addition
+    leds.setPixelColor(ledRndPos++, leds.Color(255, 0, 0));
+    leds.show();
+    
     delay(3000);
     WiFi.disconnect(true);
     ESP.reset();
     delay(5000);
   } else {
+    leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
+    leds.show();
+    
     timeClient.begin();
   }
 
@@ -185,6 +201,9 @@ void setup() {
   Serial.println("%");
 
   if (ENABLE_OTA) {
+    leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
+    leds.show();
+    
     ArduinoOTA.onStart([]() {
       Serial.println("Start");
     });
@@ -210,6 +229,9 @@ void setup() {
   }
 
   if (WEBSERVER_ENABLED) {
+    leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
+    leds.show();
+    
     server.on("/", handleHome);
     server.on("/systemreset", handleSystemReset);
     server.on("/forgetwifi", handleForgetWifi);
@@ -231,17 +253,15 @@ void setup() {
   }
 
   flashLED(1, 500);
+  leds.clear(); //   Set all pixels in RAM to 0 (off)
+  leds.show();  // Turn OFF all pixels ASAP
 }
 
 //************************************************************
 // Main Looop
 //************************************************************
 void loop() {
-
   timeClient.update();
-
-  //
-  checkDisplay(); // this will see if we need to turn it on or off for night mode.
 
   // calculate word-time
   nowHour = timeClient.getHours() % 12;
@@ -266,19 +286,35 @@ void loop() {
     hourCompensated = nowHour;
   }
 
-  if (displayOn) {
-    // only when hour changes
-    //if(displayedHour != hourCompensated || displayedMinutes != minuteRounded) {
-      //displayedHour = hourCompensated;
-      //displayedMinutes = minuteRounded;
-    // change every minute
-    if( displayedMinutes != nowMinute) {
-      displayedMinutes = nowMinute;
-      displayWordTime();
-    }
-  } else {
-    displayedHour = -1;
+   // this will see if we need to turn it on or off for night mode
+  checkDisplay();
+
+  // handle leds
+  if (!displayOn) {
     displayedMinutes = -1;
+  } else {
+    // check if we need a rainbow now
+    if(isRainbowHour && nowMinute == 0 && lastRainbowHour != nowHour) {
+      lastRainbowHour = nowHour;
+      rainbowWhell(10);
+      leds.clear(); //   Set all pixels in RAM to 0 (off)
+      leds.show();  // Turn OFF all pixels ASAP
+    }
+
+    // update words and colors when needed
+    if( isColorsPerMinute) {
+      // update colors every minute
+      if(displayedMinutes != nowMinute) {
+        displayedMinutes = nowMinute;
+        displayWordTime();
+      }
+    } else {
+      // update colors when hour-words changes
+      if( displayedMinutes != minuteRounded) {
+        displayedMinutes = minuteRounded;
+        displayWordTime();
+      }
+    }
   }
 
   //
@@ -314,6 +350,14 @@ void loadConfig() {
       timeDisplayTurnsOff.trim();
       Serial.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
     }
+    if (line.indexOf("isRainbowHour=") >= 0) {
+      isRainbowHour = line.substring(line.lastIndexOf("isRainbowHour=") + 14).toInt();
+      Serial.println("isRainbowHour=" + String(isRainbowHour));
+    }
+    if (line.indexOf("isColorsPerMinute=") >= 0) {
+      isColorsPerMinute = line.substring(line.lastIndexOf("isColorsPerMinute=") + 18).toInt();
+      Serial.println("isColorsPerMinute=" + String(isColorsPerMinute));
+    }
     if (line.indexOf("www_username=") >= 0) {
       String temp = line.substring(line.lastIndexOf("www_username=") + 13);
       temp.trim();
@@ -343,6 +387,8 @@ void saveConfig() {
     Serial.println("Saving settings now...");
     f.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
     f.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
+    f.println("isRainbowHour=" + String(isRainbowHour));
+    f.println("isColorsPerMinute=" + String(isColorsPerMinute));
     f.println("www_username=" + String(www_username));
     f.println("www_password=" + String(www_password));
     f.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
@@ -355,8 +401,13 @@ void processConfig() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
+  
   timeDisplayTurnsOn = decodeHtmlString(server.arg("startTime"));
   timeDisplayTurnsOff = decodeHtmlString(server.arg("endTime"));
+  
+  isRainbowHour = server.hasArg("isRainbowHour");
+  isColorsPerMinute = server.hasArg("isColorsPerMinute");
+  
   IS_BASIC_AUTH = server.hasArg("isBasicAuth");
   String temp = server.arg("userid");
   temp.toCharArray(www_username, sizeof(temp));
@@ -448,17 +499,29 @@ void handleConfigure() {
   String form = FPSTR(CHANGE_FORM);
 
   // Auth
-  String isUseSecurityChecked = "";
+  String tmpChecked = "";
   if (IS_BASIC_AUTH) {
-    isUseSecurityChecked = "checked='checked'";
+    tmpChecked = "checked='checked'";
   }
-  form.replace("%IS_BASICAUTH_CHECKED%", isUseSecurityChecked);
+  form.replace("%IS_BASICAUTH_CHECKED%", tmpChecked);
   form.replace("%USERID%", String(www_username));
   form.replace("%STATIONPASSWORD%", String(www_password));
 
   // Time Display on/off
   form.replace("%STARTTIME%", timeDisplayTurnsOn);
   form.replace("%ENDTIME%", timeDisplayTurnsOff);
+
+  tmpChecked = "";
+  if (isRainbowHour) {
+    tmpChecked = "checked='checked'";
+  }
+  form.replace("%IS_RAINBOW_HOUR_CHECKED%", tmpChecked);
+
+  tmpChecked = "";
+  if (isRainbowHour) {
+    tmpChecked = "checked='checked'";
+  }
+  form.replace("%IS_COLORS_PER_MINUTE%", tmpChecked);
 
   //
   server.sendContent(form); // Send the second chunk of Data
@@ -588,7 +651,8 @@ void enableDisplay(boolean enable) {
     Serial.println("Display was turned ON");
   } else {
     Serial.println("Display was turned OFF");
-    colorWipe(leds.Color( 0, 0, 0, 0), 10);
+    leds.clear();
+    leds.show();
   }
 }
 
@@ -805,7 +869,7 @@ void displayWordTime() {
     wordClockSimulated += "<div class='word-clock-row'>";
     for (int8_t col = 0; col < TOTAL_COLS; ++col) {
       if (display[row][col] == 1) {
-        int ledColor = WheelAlt(calculateMagicNumber(row, col, rnd), red, green, blue);
+        int ledColor = Wheel(calculateMagicNumber(row, col, rnd), red, green, blue);
         leds.setPixelColor(row * TOTAL_COLS + col, ledColor);
         wordClockSimulated += "<span class='letter selected' style='color:" + htmlColor(red, green, blue) + "'>" + String(text[row][col]) + "</span>";
       } else {
@@ -832,52 +896,20 @@ String htmlColor(int red, int green, int blue) {
 
 // LEDS...
 void ledsIntro() {
-  rainbow(15);
-  //colorWipe(leds.Color( 0, 0, 0, 0), 1);
-}
-
-// Fill strip pixels one after another with a color. Strip is NOT cleared
-// first; anything there will be covered pixel by pixel. Pass in color
-// (as a single 'packed' 32-bit value, which you can get by calling
-// leds.Color(red, green, blue) as shown in the loop() function above),
-// and a delay time (in milliseconds) between pixels.
-void colorWipe(uint32_t color, int wait) {
-  for (int i = 0; i < leds.numPixels(); i++) {  // For each pixel in leds...
-    leds.setPixelColor(i, color);               //  Set pixel's color (in RAM)
-    leds.show();                                //  Update strip to match
-    delay(wait);                                //  Pause for a moment
-  }
-}
-
-void rainbow(uint8_t wait) {
-  uint16_t i, j;
-  for (j = 0; j < 256; j++) {
-    for (i = 0; i < leds.numPixels(); i++) {
-      leds.setPixelColor(i, Wheel((i + j) & 255));
-    }
-    leds.show();
-    delay(wait);
-  }
+  rainbowWhell(10);
+  //testLeds();
 }
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
 uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if (WheelPos < 85) {
-    return leds.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if (WheelPos < 170) {
-    WheelPos -= 85;
-    return leds.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return leds.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  int red, green, blue;
+  return Wheel(WheelPos, red, green, blue);
 }
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
-uint32_t WheelAlt(byte WheelPos, int &red, int &green, int &blue) {
+uint32_t Wheel(byte WheelPos, int &red, int &green, int &blue) {
   WheelPos = 255 - WheelPos;
   if (WheelPos < 85) {
     red = 255 - WheelPos * 3;
@@ -897,22 +929,109 @@ uint32_t WheelAlt(byte WheelPos, int &red, int &green, int &blue) {
   return leds.Color(red, green, blue);
 }
 
-/*
-String debugOutput() {
-  String result = "<div class='word-clock'>";
-
-  for (int8_t row = 0; row < TOTAL_ROWS; row++) {
-    result += "<div class='word-clock-row'>";
-    for (int8_t col = 0; col < TOTAL_COLS; col++) {
-      if (display[row][col] == 1) {
-        result += "<span class='selected letter'>" + String(text[row][col]) + "</span>";
-      } else {
-        result += "<span class='letter'>" + String(text[row][col]) + "</span>";
-      }
+void rainbowWhell(uint8_t wait) {
+  uint16_t i, j;
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < leds.numPixels(); i++) {
+      leds.setPixelColor(i, Wheel((i + j) & 255));
     }
-    result += "</div>";
+    leds.show();
+    delay(wait);
   }
-  result += "</div>";
-  return result;
 }
-*/
+
+// Some functions of our own for creating animated effects -----------------
+void testLeds() {
+  // Fill along the length of the strip in various colors...
+  colorWipe(leds.Color(255,   0,   0), 50); // Red
+  colorWipe(leds.Color(  0, 255,   0), 50); // Green
+  colorWipe(leds.Color(  0,   0, 255), 50); // Blue
+
+  // Do a theater marquee effect in various colors...
+  flashLED(1, 500);
+  theaterChase(leds.Color(127, 127, 127), 50); // White, half brightness
+  theaterChase(leds.Color(127,   0,   0), 50); // Red, half brightness
+  theaterChase(leds.Color(  0,   0, 127), 50); // Blue, half brightness
+
+  flashLED(2, 500);
+  rainbow(10);             // Flowing rainbow cycle along the whole strip
+
+  flashLED(3, 500);
+  theaterChaseRainbow(50); // Rainbow-enhanced theaterChase variant
+}
+
+// Fill strip pixels one after another with a color. Strip is NOT cleared
+// first; anything there will be covered pixel by pixel. Pass in color
+// (as a single 'packed' 32-bit value, which you can get by calling
+// leds.Color(red, green, blue) as shown in the loop() function above),
+// and a delay time (in milliseconds) between pixels.
+void colorWipe(uint32_t color, int wait) {
+  for (int i = 0; i < leds.numPixels(); i++) {  // For each pixel in leds...
+    leds.setPixelColor(i, color);               //  Set pixel's color (in RAM)
+    leds.show();                                //  Update strip to match
+    delay(wait);                                //  Pause for a moment
+  }
+}
+
+// Rainbow cycle along whole strip. Pass delay time (in ms) between frames.
+void rainbow(int wait) {
+  // Hue of first pixel runs 5 complete loops through the color wheel.
+  // Color wheel has a range of 65536 but it's OK if we roll over, so
+  // just count from 0 to 5*65536. Adding 256 to firstPixelHue each time
+  // means we'll make 5*65536/256 = 1280 passes through this outer loop:
+  for(long firstPixelHue = 0; firstPixelHue < 5*65536; firstPixelHue += 256) {
+    for(int i=0; i<leds.numPixels(); i++) { // For each pixel in strip...
+      // Offset pixel hue by an amount to make one full revolution of the
+      // color wheel (range of 65536) along the length of the strip
+      // (leds.numPixels() steps):
+      int pixelHue = firstPixelHue + (i * 65536L / leds.numPixels());
+      // leds.ColorHSV() can take 1 or 3 arguments: a hue (0 to 65535) or
+      // optionally add saturation and value (brightness) (each 0 to 255).
+      // Here we're using just the single-argument hue variant. The result
+      // is passed through leds.gamma32() to provide 'truer' colors
+      // before assigning to each pixel:
+      leds.setPixelColor(i, leds.gamma32(leds.ColorHSV(pixelHue)));
+    }
+    leds.show(); // Update strip with new contents
+    delay(wait);  // Pause for a moment
+  }
+}
+
+// Theater-marquee-style chasing lights. Pass in a color (32-bit value,
+// a la leds.Color(r,g,b) as mentioned above), and a delay time (in ms)
+// between frames.
+void theaterChase(uint32_t color, int wait) {
+  for(int a=0; a<10; a++) {  // Repeat 10 times...
+    for(int b=0; b<3; b++) { //  'b' counts from 0 to 2...
+      leds.clear();         //   Set all pixels in RAM to 0 (off)
+      // 'c' counts up from 'b' to end of strip in steps of 3...
+      for(int c=b; c<leds.numPixels(); c += 3) {
+        leds.setPixelColor(c, color); // Set pixel 'c' to value 'color'
+      }
+      leds.show(); // Update strip with new contents
+      delay(wait);  // Pause for a moment
+    }
+  }
+}
+
+// Rainbow-enhanced theater marquee. Pass delay time (in ms) between frames.
+void theaterChaseRainbow(int wait) {
+  int firstPixelHue = 0;     // First pixel starts at red (hue 0)
+  for(int a=0; a<30; a++) {  // Repeat 30 times...
+    for(int b=0; b<3; b++) { //  'b' counts from 0 to 2...
+      leds.clear();         //   Set all pixels in RAM to 0 (off)
+      // 'c' counts up from 'b' to end of strip in increments of 3...
+      for(int c=b; c<leds.numPixels(); c += 3) {
+        // hue of pixel 'c' is offset by an amount to make one full
+        // revolution of the color wheel (range 65536) along the length
+        // of the strip (leds.numPixels() steps):
+        int      hue   = firstPixelHue + c * 65536L / leds.numPixels();
+        uint32_t color = leds.gamma32(leds.ColorHSV(hue)); // hue -> RGB
+        leds.setPixelColor(c, color); // Set pixel 'c' to value 'color'
+      }
+      leds.show();                 // Update strip with new contents
+      delay(wait);                 // Pause for a moment
+      firstPixelHue += 65536 / 90; // One cycle of color wheel over 90 frames
+    }
+  }
+}
