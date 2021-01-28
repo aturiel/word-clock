@@ -461,17 +461,21 @@ void handleHome() {
   server.send(200, "text/html", "");
   sendHeader();
 
+  html += "<div class='w3-container w3-center'>";
   if(displayOn) {
-    html += "<p> Display ON</p>";
+    html += "<h2 class='w3-light-green'>Display ON</h2>";
   } else {
-    html += "<p> Display OFF</p>";
+    html += "<h2 class='w3-deep-orange'>Display OFF</h2>";
   }
-  html += "<p>" + timeClient.getFormattedTime() + "</p>";
+  html += "<h3>" + timeClient.getFormattedTime() + "</h3>";
+  html += "</div>";
+  /*
   html += "<p>" + String(nowHour) + ":" + String(nowMinute) + "</p>";
   html += "<p> compensated hour: " + String(hourCompensated);
   html += " rounded minute: " + String(minuteRounded) + "</p>";
+  */
   html += "<hr>";
-  html += "<code>" + wordClockSimulated + "</code>";
+  html += "<code class='w3-border w3-codespan'>" + wordClockSimulated + "</code>";
 
   server.sendContent(String(html)); // spit out what we got
 
@@ -562,7 +566,7 @@ void sendHeader() {
   html += "<meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
   html += "<link rel='stylesheet' href='https://www.w3schools.com/w3css/4/w3.css'>";
-  html += "<link rel='stylesheet' href='https://www.w3schools.com/lib/w3-theme-blue-grey.css'>";
+  html += "<link rel='stylesheet' href='https://www.w3schools.com/lib/w3-theme-indigo.css'>";
   html += "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.1/css/all.min.css'>";
   html += "<style>";
   html += "div.word-clock {text-align: center;}";
