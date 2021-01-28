@@ -11,12 +11,12 @@ letters = [
 ];
 
 $fn = 64;
-max = 63; 
+max = 63;   // led side?
 s = 63/8;
-d_h = 5;
-w_h = 10;
-b_h = 5;
-c_h = 23;
+d_h = 5;    // led dividers?
+w_h = 10;   // face height
+b_h = 5;    // dividers height
+c_h = 30;   // base height
 letter_depth = w_h+1;
 
 diffusers_height = 2.2;
@@ -100,8 +100,8 @@ module standoff()
 {
 	difference()
 	{
-		cylinder(d1=7,d2=5,h=7);
-		translate([0,0,2])	cylinder(d=2.5, h=7);
+		cylinder(d1=7,d2=5,h=22);
+		translate([0,0,10])	cylinder(d=2.5, h=22);
 	}
 }
 
@@ -124,13 +124,29 @@ module case_back()
 		translate([-1.5,max+1+1.5,0]) 		cylinder(d=3,h=c_h+4);	// ul
 		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=3,h=c_h+4);	// ur 
 		
-		translate([-1.5,-1.5,0]) 			cylinder(d=5.5,h=4);	// ll 
-		translate([max+1+1.5,-5+3.5,0]) 	cylinder(d=5.5,h=4);	// lr
-		translate([-1.5,max+1+1.5,0]) 		cylinder(d=5.5,h=4);	// ul
-		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=5.5,h=4);	// ur 
-		
+		translate([-1.5,-1.5,0]) 			cylinder(d=5.5,h=22, center=true);	// ll 
+		translate([max+1+1.5,-5+3.5,0]) 	cylinder(d=5.5,h=22, center=true);	// lr
+		translate([-1.5,max+1+1.5,0]) 		cylinder(d=5.5,h=22, center=true);	// ul
+		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=5.5,h=22, center=true);	// ur 
+
+        // ventilation grill
+        tol = 0.2;
+        translate([12,15.5,0])	
+             difference(){
+               linear_extrude(height = 10)
+               cube([16,30,10]);
+               for (x=[0:4:16]){
+                 for (y=[0:4:32]){
+                   translate([x,y,-tol/2]){
+                     cylinder(r=1.5,h=10+tol,$fn=180);
+                   }
+                 }
+               }
+             }
+            
+            
 		// FTDI cutout
-		#translate([18+6+5+6,-5,15])	cube([19, 8, 8]); 	// bottom
+		//#translate([18+6+5+6,-5,15])	cube([19, 8, 8]); 	// bottom
 
 		// Time Adjust Button Holes
         /*
@@ -160,10 +176,10 @@ module case_back()
 		*/
 
 		// power socket cutout
-		translate([12,13,0])
-			 cylinder(d=12,h=16);
+		translate([4,(max/2),0])
+			 cylinder(d=8,h=6, center=true);
 		
-		translate([12,26,0.2]) rotate([0,180,0])
+		/*translate([12,26,0.2]) rotate([0,180,0])
 					linear_extrude(height = 0.2)
 					text(
 						"+5vdc", 
@@ -172,22 +188,47 @@ module case_back()
 						$fn=20, 
 						valign="center", 
 						halign = "center"
-					);
+					);*/
 	}
+    
+	// standoffs for AC-DC
+	translate([5+5+7   , 7   , 2]) 	standoff();
+	translate([5+5+7   , 7+50, 2]) 	standoff();
 	
-	// standoffs for pc 
-	translate([18+5+5, 10, 2]) 			standoff();
-	translate([18+5+5, 10+46, 2]) 		standoff();
-	translate([18+30+5+5, 10, 2]) 		standoff();
-	translate([18+30+5+5, 10+46, 2]) 	standoff();
+	// standoffs for ESP 
+	translate([24+5+5   , 6   , 2]) 	standoff();
+	translate([24+5+5   , 6+52, 2]) 	standoff();
+	translate([24+5+5+25, 6   , 2])		standoff();
+	translate([24+5+5+25, 6+52, 2]) 	standoff();
 }
 
+module dot_pattern(size, line_size, line_space) {
+    rad = line_space / 2;
+    y_offset = sqrt((rad + line_size / 2) * (rad + line_size / 2) * 4 - (rad + line_size / 2) * (rad + line_size / 2));
+    num_x = ceil(size / rad / 2) * 1.42;
+    num_y = ceil(size / y_offset) * 1.42;
+    difference() {
+        square([size * 1.42, size * 1.42], center = true);
+        for(y = [floor(-num_y / 2) : ceil(num_y / 2)]) {
+            odd = (y % 2 == 0) ? 0 : rad + line_size / 2;
+            for(x = [floor(-num_x / 2) : ceil(num_x / 2)]) {
+                translate([x * (rad + line_size / 2) * 2 + odd, y * y_offset]) {
+                    rotate(30) {
+                        circle(d=line_space);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 // uncomment for clock face
-//translate([-15,0,10]) rotate([0,180,0]) clock_face();
+translate([-15,0,10]) rotate([0,180,0]) clock_face();
 
 // uncomment for led diffusers
 //translate([0,-80,0]) diffusers();
 
 // uncomment for back of case
-case_back();
+//case_back();
 
