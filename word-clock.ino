@@ -461,21 +461,21 @@ void handleHome() {
   server.send(200, "text/html", "");
   sendHeader();
 
-  html += "<div class='w3-container w3-center'>";
+  html += "<div class='w3-container w3-center w3-theme-l1'><h2>";
   if(displayOn) {
-    html += "<h2 class='w3-light-green'>Display ON</h2>";
+    html += "Lights ON";
   } else {
-    html += "<h2 class='w3-deep-orange'>Display OFF</h2>";
+    html += "Lights OFF";
   }
-  html += "<h3>" + timeClient.getFormattedTime() + "</h3>";
-  html += "</div>";
+  html += " · " + timeClient.getFormattedTime();
   /*
-  html += "<p>" + String(nowHour) + ":" + String(nowMinute) + "</p>";
-  html += "<p> compensated hour: " + String(hourCompensated);
-  html += " rounded minute: " + String(minuteRounded) + "</p>";
+  html += " · " + String(nowHour) + ":" + String(nowMinute);
+  html += " // compensated hour: " + String(hourCompensated);
+  html += " // rounded minute: " + String(minuteRounded);
   */
-  html += "<hr>";
-  html += "<code class='w3-border w3-codespan'>" + wordClockSimulated + "</code>";
+  html += "</h2></div>";
+
+  html += "<div class='w3-row w3-center'>" + wordClockSimulated + "</div>";
 
   server.sendContent(String(html)); // spit out what we got
 
@@ -569,9 +569,10 @@ void sendHeader() {
   html += "<link rel='stylesheet' href='https://www.w3schools.com/lib/w3-theme-indigo.css'>";
   html += "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.1/css/all.min.css'>";
   html += "<style>";
-  html += "div.word-clock {text-align: center;}";
-  html += "span.letter {font:'monospaced'; font-size: 150%; color:lightgrey; padding: 0px 8px;}";
-  html += "span.selected {font-weight: bold; color:black;}";
+  html += "div.word-clock {text-align: center; font-family: 'Courier New', monospace; font-weight: 800; font-size: 200%; margin-top: 20px; }";
+  html += "div.word-clock-row { line-height: 1; }";
+  html += "span.letter {color: #DDD; background-color: #EEE; padding: 2px 8px;}";
+  html += "span.selected {color:white; font-weight: bold; }";
   html += "</style>";
   html += "</head><body>";
   server.sendContent(html);
@@ -583,9 +584,9 @@ void sendHeader() {
 
   server.sendContent(FPSTR(WEB_ACTIONS1));
   if (displayOn) {
-    server.sendContent("<i class='fas fa-eye-slash'></i> Turn Display OFF");
+    server.sendContent("<i class='fas fa-eye-slash'></i> Turn Lights OFF");
   } else {
-    server.sendContent("<i class='fas fa-eye'></i> Turn Display ON");
+    server.sendContent("<i class='fas fa-eye'></i> Turn Lights ON");
   }
   server.sendContent(FPSTR(WEB_ACTION2));
 
@@ -652,9 +653,9 @@ void enableDisplay(boolean enable) {
   displayOn = enable;
 
   if (enable) {
-    Serial.println("Display was turned ON");
+    Serial.println("Lights ON");
   } else {
-    Serial.println("Display was turned OFF");
+    Serial.println("Lights OFF");
     leds.clear();
     leds.show();
   }
