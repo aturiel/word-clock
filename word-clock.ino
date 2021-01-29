@@ -30,21 +30,6 @@
 
 #define HOSTNAME "WORD-CLOCK-"
 #define CONFIG "/conf.txt"
-#define BUZZER_PIN  D5
-
-/* Useful Constants */
-/*
-#define SECS_PER_MIN  (60UL)
-#define SECS_PER_HOUR (3600UL)
-#define SECS_PER_DAY  (SECS_PER_HOUR * 24L)
-*/
-/* Useful Macros for getting elapsed time */
-/*
-#define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)
-#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN)
-#define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
-#define elapsedDays(_time_) ( _time_ / SECS_PER_DAY)
-*/
 
 //declairing prototypes
 void configModeCallback (WiFiManager *myWiFiManager);
@@ -87,14 +72,17 @@ static const char CHANGE_FORM[] PROGMEM = "<form class='w3-container' action='/s
     "<p><label>Display OFF Time (24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work)</label><input class='w3-input w3-border w3-margin-bottom' name='endTime' type='time' value='%ENDTIME%'></p>"
     "<p><label>Display ON Time (24 Hour Format HH:MM -- Leave blank for always on)</label><input class='w3-input w3-border w3-margin-bottom' name='startTime' type='time' value='%STARTTIME%'></p>"
     "<hr>"
-    "<h3>Colors</h3>"
+    "<h3>Miscellaneous</h3>"
     "<p><input name='isRainbowHour' class='w3-check w3-margin-top' type='checkbox' %IS_RAINBOW_HOUR_CHECKED%> Display rainbow animation on the hour</p>"    
     "<p><input name='isColorsPerMinute' class='w3-check w3-margin-top' type='checkbox' %IS_COLORS_PER_MINUTE%> Update colors every minute</p>"
+    "<p><input name='isBuzzerEnabled' class='w3-check w3-margin-top' type='checkbox' %IS_BUZZER_ENABLED%> Buzzer active</p>"
     "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
     "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
 // Change the externalLight to the pin you wish to use if other than the Built-in LED
 int externalLight = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the Wemos
+
+#define BUZZER_PIN  D5
 
 // Which pin on the Arduino is connected to the NeoPixels?
 #define LED_PIN    D4
@@ -129,6 +117,7 @@ int8_t minuteRounded;
 int8_t hourCompensated;
 
 int8_t lastRainbowHour;
+
 //
 void setup() {
   Serial.begin (115200);
@@ -143,17 +132,6 @@ void setup() {
   leds.show(); // Turn OFF all pixels ASAP
   leds.setBrightness(BRIGHTNESS);
 
-  // start-up chime
-  /*
-    tone(BUZZER_PIN, 415, 500);
-    delay(500 * 1.3);
-    tone(BUZZER_PIN, 466, 500);
-    delay(500 * 1.3);
-    tone(BUZZER_PIN, 370, 1000);
-    delay(1000 * 1.3);
-    noTone(BUZZER_PIN);
-  */
-
   ledsIntro();
   leds.clear(); //   Set all pixels in RAM to 0 (off)
   int ledRndPos = random(0, leds.numPixels());
@@ -166,6 +144,11 @@ void setup() {
   loadConfig();
   leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
   leds.show();
+
+  // start-up chime
+  if( isBuzzerEnabled) {  
+    startupChime();
+  }
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -182,8 +165,6 @@ void setup() {
   hostname += String(ESP.getChipId(), HEX);
   if (!wifiManager.autoConnect((const char *)hostname.c_str())) {// new addition
     leds.setPixelColor(ledRndPos++, leds.Color(255, 0, 0));
-    leds.show();
-    
     delay(3000);
     WiFi.disconnect(true);
     ESP.reset();
@@ -191,7 +172,6 @@ void setup() {
   } else {
     leds.setPixelColor(ledRndPos++, leds.Color(0, 255, 0));
     leds.show();
-    
     timeClient.begin();
   }
 
@@ -253,6 +233,7 @@ void setup() {
   }
 
   flashLED(1, 500);
+
   leds.clear(); //   Set all pixels in RAM to 0 (off)
   leds.show();  // Turn OFF all pixels ASAP
 }
@@ -358,6 +339,10 @@ void loadConfig() {
       isColorsPerMinute = line.substring(line.lastIndexOf("isColorsPerMinute=") + 18).toInt();
       Serial.println("isColorsPerMinute=" + String(isColorsPerMinute));
     }
+    if (line.indexOf("isBuzzerEnabled=") >= 0) {
+      isBuzzerEnabled = line.substring(line.lastIndexOf("isBuzzerEnabled=") + 16).toInt();
+      Serial.println("isBuzzerEnabled=" + String(isBuzzerEnabled));
+    }
     if (line.indexOf("www_username=") >= 0) {
       String temp = line.substring(line.lastIndexOf("www_username=") + 13);
       temp.trim();
@@ -389,6 +374,7 @@ void saveConfig() {
     f.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
     f.println("isRainbowHour=" + String(isRainbowHour));
     f.println("isColorsPerMinute=" + String(isColorsPerMinute));
+    f.println("isBuzzerEnabled=" + String(isBuzzerEnabled));
     f.println("www_username=" + String(www_username));
     f.println("www_password=" + String(www_password));
     f.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
@@ -407,6 +393,7 @@ void processConfig() {
   
   isRainbowHour = server.hasArg("isRainbowHour");
   isColorsPerMinute = server.hasArg("isColorsPerMinute");
+  isBuzzerEnabled = server.hasArg("isBuzzerEnabled");
   
   IS_BASIC_AUTH = server.hasArg("isBasicAuth");
   String temp = server.arg("userid");
@@ -527,6 +514,12 @@ void handleConfigure() {
   }
   form.replace("%IS_COLORS_PER_MINUTE%", tmpChecked);
 
+  tmpChecked = "";
+  if (isBuzzerEnabled) {
+    tmpChecked = "checked='checked'";
+  }
+  form.replace("%IS_BUZZER_ENABLED%", tmpChecked);
+
   //
   server.sendContent(form); // Send the second chunk of Data
 
@@ -623,18 +616,6 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println(myWiFiManager->getConfigPortalSSID());
   Serial.println("To setup Wifi Configuration");
   Serial.println("Please Connect to AP: " + String(myWiFiManager->getConfigPortalSSID()));
-}
-
-void flashLED(int number, int delayTime) {
-  for (int inx = 0; inx < number; inx++) {
-    tone(BUZZER_PIN, 440, delayTime);
-    delay(delayTime);
-    digitalWrite(externalLight, LOW);
-    delay(delayTime);
-    digitalWrite(externalLight, HIGH);
-    delay(delayTime);
-  }
-  noTone(BUZZER_PIN);
 }
 
 // converts the dBm to a range between 0 and 100%
@@ -901,8 +882,29 @@ String htmlColor(int red, int green, int blue) {
 
 // LEDS...
 void ledsIntro() {
-  rainbowWhell(10);
-  //testLeds();
+  int rnd = random(0, 5);
+  
+  switch(rnd) {
+    case 0:
+      rainbow(10);
+      break;
+    case 1:
+      rainbowWhell(10);
+      break;
+    case 2:
+      theaterChaseRainbow(50); 
+      break;
+    case 3:
+      theaterChase(leds.Color(127, 127, 127), 50); // White, half brightness
+      theaterChase(leds.Color(127,   0,   0), 50); // Red, half brightness
+      theaterChase(leds.Color(  0,   0, 127), 50); // Blue, half brightness
+      break;
+    case 4:
+      // Fill along the length of the strip in various colors...
+      colorWipe(leds.Color(255,   0,   0), 30); // Red
+      colorWipe(leds.Color(  0, 255,   0), 30); // Green
+      colorWipe(leds.Color(  0,   0, 255), 30); // Blue    
+  }
 }
 
 // Input a value 0 to 255 to get a color value.
@@ -953,15 +955,12 @@ void testLeds() {
   colorWipe(leds.Color(  0,   0, 255), 50); // Blue
 
   // Do a theater marquee effect in various colors...
-  flashLED(1, 500);
   theaterChase(leds.Color(127, 127, 127), 50); // White, half brightness
   theaterChase(leds.Color(127,   0,   0), 50); // Red, half brightness
   theaterChase(leds.Color(  0,   0, 127), 50); // Blue, half brightness
 
-  flashLED(2, 500);
   rainbow(10);             // Flowing rainbow cycle along the whole strip
 
-  flashLED(3, 500);
   theaterChaseRainbow(50); // Rainbow-enhanced theaterChase variant
 }
 
@@ -1040,3 +1039,79 @@ void theaterChaseRainbow(int wait) {
     }
   }
 }
+
+// Onboard LED
+void flashLED(int number, int delayTime) {
+  for (int inx = 0; inx < number; inx++) {
+      if( isBuzzerEnabled) {
+        tone(BUZZER_PIN, 440, delayTime);
+        delay(delayTime);
+      }
+    digitalWrite(externalLight, LOW);
+    delay(delayTime);
+    digitalWrite(externalLight, HIGH);
+    delay(delayTime);
+  }
+  noTone(BUZZER_PIN);
+}
+
+// BUZZER
+const int c = 261;
+const int d = 294;
+const int e = 329;
+const int f = 349;
+const int g = 391;
+const int gS = 415;
+const int a = 440;
+const int aS = 455;
+const int b = 466;
+const int cH = 523;
+const int cSH = 554;
+const int dH = 587;
+const int dSH = 622;
+const int eH = 659;
+const int fH = 698;
+const int fSH = 740;
+const int gH = 784;
+const int gSH = 830;
+const int aH = 880;
+
+void beep(int note, int duration)
+{
+  //Play tone on buzzerPin
+  tone(BUZZER_PIN, note, duration);
+ 
+  // LED 
+  digitalWrite(externalLight, HIGH);
+  delay(duration);
+  digitalWrite(externalLight, LOW);
+ 
+  //Stop tone on buzzerPin
+  noTone(BUZZER_PIN);
+ 
+  delay(50);
+}
+
+void startupChime() {
+    /*
+    tone(BUZZER_PIN, 415, 500);
+    delay(500 * 1.3);
+    tone(BUZZER_PIN, 466, 500);
+    delay(500 * 1.3);
+    tone(BUZZER_PIN, 370, 1000);
+    delay(1000 * 1.3);
+    noTone(BUZZER_PIN);
+    */
+
+    // https://www.tecnosalva.com/haciendo-musica-con-arduino-y-un-buzzer-piezoelectrico/
+    beep(a, 500);
+    beep(a, 500);    
+    beep(a, 500);
+    beep(f, 350);
+    beep(cH, 150);  
+    beep(a, 500);
+    beep(f, 350);
+    beep(cH, 150);
+    beep(a, 650);
+}
+

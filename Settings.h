@@ -60,6 +60,7 @@ String timeDisplayTurnsOn = "";   // 24 Hour Format HH:MM -- Leave blank for alw
 String timeDisplayTurnsOff = "";  // 24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work.
 boolean isRainbowHour = false;    // Display rainbow animation on the hour
 boolean isColorsPerMinute = true; // Update colors every minute
+boolean isBuzzerEnabled = false;  // Buzzer enabled
 
 boolean ENABLE_OTA = true;  // this will allow you to load firmware to the device over WiFi (see OTA for ESP8266)
 String OTA_Password = "";   // Set an OTA password here -- leave blank if you don't want to be prompted for password
