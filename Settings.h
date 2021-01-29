@@ -35,21 +35,15 @@ SOFTWARE.
  * the Web Interface.
  ******************************************************************************/
  
+#include "FS.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
+//#include <ESP8266mDNS.h>
 #include <WiFiManager.h> // --> https://github.com/tzapu/WiFiManager
-#include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
-#include "FS.h"
-
-#include <NTPClient.h>
-#include <WiFiUdp.h>
-
-#include <TimeLib.h>
-
-// LED output
-#include <Adafruit_NeoPixel.h>
+#include <NTPClient.h> // --> https://github.com/arduino-libraries/NTPClient
+#include <Adafruit_NeoPixel.h> // --> https://github.com/adafruit/Adafruit_NeoPixel
 
 //******************************
 // Start Settings
