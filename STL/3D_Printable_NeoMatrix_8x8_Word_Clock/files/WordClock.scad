@@ -11,15 +11,15 @@ letters = [
 ];
 
 $fn = 64;
-max = 63;   // led side?
-s = 63/8;
+max = 66;   // led side?
+s = 66/8;
 d_h = 5;    // led dividers?
 w_h = 10;   // face height
 b_h = 5;    // dividers height
 c_h = 30;   // base height
 letter_depth = w_h+1;
 
-diffusers_height = 2.2;
+diffusers_height = 2.5;
 
 f = "stencil std";
 
@@ -92,8 +92,9 @@ module diffusers()
 	difference()
 	{
 		translate([1,1,0]) cube([max,max,diffusers_height]);
-		dividers(1.8 );
+		dividers(1.8);
 	}	
+    translate([1,1,diffusers_height]) cube([max,max,0.15]);
 }
 
 module standoff()
@@ -224,10 +225,10 @@ module dot_pattern(size, line_size, line_space) {
 
 
 // uncomment for clock face
-translate([-15,0,10]) rotate([0,180,0]) clock_face();
+//translate([-15,0,10]) rotate([0,180,0]) clock_face();
 
 // uncomment for led diffusers
-//translate([0,-80,0]) diffusers();
+translate([0,-80,0]) diffusers();
 
 // uncomment for back of case
 //case_back();
