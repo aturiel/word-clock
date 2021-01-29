@@ -16,10 +16,10 @@ s = 66/8;
 d_h = 5;    // led dividers?
 w_h = 10;   // face height
 b_h = 5;    // dividers height
-c_h = 30;   // base height
+c_h = 35;   // base height
 letter_depth = w_h+1;
 
-diffusers_height = 2.5;
+diffusers_height = 2.25;
 
 f = "stencil std";
 
@@ -94,15 +94,15 @@ module diffusers()
 		translate([1,1,0]) cube([max,max,diffusers_height]);
 		dividers(1.8);
 	}	
-    translate([1,1,diffusers_height]) cube([max,max,0.15]);
+    translate([1,1,diffusers_height]) cube([max,max,0.30]);
 }
 
 module standoff()
 {
 	difference()
 	{
-		cylinder(d1=7,d2=5,h=22);
-		translate([0,0,10])	cylinder(d=2.5, h=22);
+		cylinder(d1=7,d2=5,h=28);
+		translate([0,0,19])	cylinder(d=2.5, h=10);
 	}
 }
 
@@ -125,11 +125,11 @@ module case_back()
 		translate([-1.5,max+1+1.5,0]) 		cylinder(d=3,h=c_h+4);	// ul
 		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=3,h=c_h+4);	// ur 
 		
-		translate([-1.5,-1.5,0]) 			cylinder(d=5.5,h=22, center=true);	// ll 
-		translate([max+1+1.5,-5+3.5,0]) 	cylinder(d=5.5,h=22, center=true);	// lr
-		translate([-1.5,max+1+1.5,0]) 		cylinder(d=5.5,h=22, center=true);	// ul
-		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=5.5,h=22, center=true);	// ur 
-
+		translate([-1.5,-1.5,0]) 			cylinder(d=5.5,h=c_h+28, center=true);	// ll 
+		translate([max+1+1.5,-5+3.5,0]) 	cylinder(d=5.5,h=c_h+28, center=true);	// lr
+		translate([-1.5,max+1+1.5,0]) 		cylinder(d=5.5,h=c_h+28, center=true);	// ul
+		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=5.5,h=c_h+28, center=true);	// ur 
+        
         // ventilation grill
         tol = 0.2;
         translate([12,15.5,0])	
@@ -193,14 +193,18 @@ module case_back()
 	}
     
 	// standoffs for AC-DC
-	translate([5+5+7   , 7   , 2]) 	standoff();
-	translate([5+5+7   , 7+50, 2]) 	standoff();
+	translate([5+5+9, 8    , 2]) 	standoff();
+	translate([5+5+9, 8 +50, 2]) 	standoff();
 	
 	// standoffs for ESP 
-	translate([24+5+5   , 6   , 2]) 	standoff();
-	translate([24+5+5   , 6+52, 2]) 	standoff();
-	translate([24+5+5+25, 6   , 2])		standoff();
-	translate([24+5+5+25, 6+52, 2]) 	standoff();
+	translate([5+5+28    , 6    , 2]) 	standoff();
+	translate([5+5+28    , 6 +52, 2]) 	standoff();
+	translate([5+5+28 +25, 6    , 2])	standoff();
+	translate([5+5+28 +25, 6 +52, 2]) 	standoff();
+    
+    // debug modules
+    //#translate([6, 13, 8])	cube([28, 40, 23]); 	// AC-DC
+    //#translate([35, 3, 7])	cube([31, 60, 23]); 	// ESP
 }
 
 module dot_pattern(size, line_size, line_space) {
@@ -225,10 +229,10 @@ module dot_pattern(size, line_size, line_space) {
 
 
 // uncomment for clock face
-//translate([-15,0,10]) rotate([0,180,0]) clock_face();
+translate([-15,0,10]) rotate([0,180,0]) clock_face();
 
 // uncomment for led diffusers
-translate([0,-80,0]) diffusers();
+//translate([0,-80,0]) diffusers();
 
 // uncomment for back of case
 //case_back();
