@@ -462,7 +462,9 @@ void handleHome() {
   */
   html += "</h2></div>";
 
-  html += "<div class='w3-row w3-center'>" + wordClockSimulated + "</div>";
+  if(displayOn) {
+    html += "<div class='w3-row w3-center'>" + wordClockSimulated + "</div>";
+  }
 
   server.sendContent(String(html)); // spit out what we got
 
