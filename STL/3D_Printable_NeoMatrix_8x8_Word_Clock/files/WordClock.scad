@@ -118,6 +118,26 @@ module case_back()
 			translate([max+1,  -5, 0])		cube([5    , max+6+5, c_h]);    // right side 
 			translate([    0, max, 0]) 	    cube([max+2,       6, c_h]);	// top
 			translate([   -1,  -5, 0])		cube([max+2,       6, c_h]); 	// bottom
+            
+            // reinforcement bottom left
+            translate([ -1, -1, 0])      
+                linear_extrude(height = c_h, convexity = 10, twist = 0)
+                polygon(points=[[0,0],[10,0],[0,10]], paths=[[0,1,2]]);
+
+            // reinforcement bottom right
+            #translate([ -1, max+1, 0])      
+                linear_extrude(height = c_h, convexity = 10, twist = 0)
+                polygon(points=[[0,0],[10,0],[0,-10]], paths=[[0,1,2]]);
+            
+            // reinforcement top left
+            translate([ max+1, -1, 0])      
+                linear_extrude(height = esp_height+2, convexity = 10, twist = 0)
+                polygon(points=[[0,0],[-9,0],[0,9]], paths=[[0,1,2]]);
+            
+            // reinforcement top right
+            translate([ max+1, max+1, 0])      
+                linear_extrude(height = esp_height+2, convexity = 10, twist = 0)
+                polygon(points=[[0,0],[-11,0],[0,-11]], paths=[[0,1,2]]);
 		}
 		
 		// mount holes 
@@ -148,8 +168,9 @@ module case_back()
              }
             
         // slots for LED connector
-		#translate([max-12,max-0.5,c_h-9])	cube([12, 4.5, 10]); 	
-		#translate([1,0-3,c_h-9])	cube([12, 4.5, 10]);
+        led_connector_deep = 9;
+		#translate([max-12, max-0.5, c_h-led_connector_deep])	cube([12, 4.5, led_connector_deep]); 	
+		#translate([     1,      -3, c_h-led_connector_deep])	cube([12, 10, led_connector_deep]);
             
 		// power socket cutout
 		translate([5,(max/2),0])
@@ -196,18 +217,12 @@ module case_back()
 	translate([esp_x+esp_width, esp_y+esp_length  , 2]) standoff(esp_height, width_bottom, width_top);
     
     // aditional supports for AC-DC
-	#translate([acdc_x-(width_top/2), 0    , 2])    cube([8,8,14]); //OK
-	#translate([acdc_x-(width_top/2), max-9, 2]) 	cube([8,9,14]); //OK
+	#translate([acdc_x-(width_top/2), 0    , 2])    cube([8,8,14]);
+	#translate([acdc_x-(width_top/2), max-9, 2]) 	cube([8,9,14]);
 
     // aditional supports for ESP 
-	#translate([esp_x-(width_top/2),     0, 2])    cube([8,7,12]); //OK
-	#translate([esp_x-(width_top/2), max-9, 2])    cube([8,9,12]); //OK
-    
-	#translate([esp_x-(width_top/2)+esp_width    , 0, 2])   cube([9,4.5,21]);
-	#translate([esp_x-(width_top/2)+esp_width+5.5, 0, 2]) 	cube([4,8,21]);
-    
-	#translate([esp_x-(width_top/2)+esp_width    , esp_y+esp_length+1.5, 2]) cube([9,8,21]);
-	#translate([esp_x-(width_top/2)+esp_width+5.5, esp_y+esp_length-3  , 2]) cube([4,5,21]);
+	#translate([esp_x-(width_top/2),     0, 2])     cube([8,4.7,esp_height]);
+	#translate([esp_x-(width_top/2), max-6.5, 2])   cube([8,7,esp_height]); 
 }
 
 // uncomment for clock face
