@@ -21,7 +21,8 @@ letter_depth = w_h+1;
 
 diffusers_height = 2.25;
 
-f = "stencil std";
+font_face = "stencil std";
+font_brand = "futura";
 
 module face()
 {
@@ -33,7 +34,7 @@ module face()
 				linear_extrude(height = letter_depth+1)
 					text(
 						letters[7-c][r], 
-						font = f,
+						font = font_face,
 						size=6, 
 						$fn=20, 
 						valign="center", 
@@ -97,12 +98,12 @@ module diffusers()
     translate([1,1,diffusers_height]) cube([max,max,0.30]);
 }
 
-module standoff()
+module standoff( height, width_bottom, width_top)
 {
 	difference()
 	{
-		cylinder(d1=7,d2=5,h=28);
-		translate([0,0,19])	cylinder(d=2.5, h=10);
+		cylinder(d1=width_bottom,d2=width_top,h=height);
+		translate([0,0,height-10+1])	cylinder(d=2.5, h=10);
 	}
 }
 
@@ -112,128 +113,109 @@ module case_back()
 	{
 		union()
 		{
-			cube([max+1,max+1,2]);
-			translate([-5,-5,0]) 		cube([5,max+6+5, c_h]);	// left side
-			translate([max+1,-5,0])		cube([5,max+6+5, c_h]); // right side 
-			translate([0,max,0]) 	    cube([max+2, 6, c_h]);	// top
-			translate([-1,-5,0])		cube([max+2, 6, c_h]); 	// bottom
+			cube([max+1, max+1, 2]);
+			translate([   -5,  -5, 0]) 		cube([5    , max+6+5, c_h]);	// left side
+			translate([max+1,  -5, 0])		cube([5    , max+6+5, c_h]);    // right side 
+			translate([    0, max, 0]) 	    cube([max+2,       6, c_h]);	// top
+			translate([   -1,  -5, 0])		cube([max+2,       6, c_h]); 	// bottom
 		}
 		
 		// mount holes 
-		translate([-1.5,-1.5,0]) 			cylinder(d=3,h=c_h+4);	// ll 
-		translate([max+1+1.5,-5+3.5,0]) 	cylinder(d=3,h=c_h+4);	// lr
-		translate([-1.5,max+1+1.5,0]) 		cylinder(d=3,h=c_h+4);	// ul
-		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=3,h=c_h+4);	// ur 
+        screwDeep = 17;
+		translate([     -1.5,      -1.5, 0]) 	cylinder(d=3,h=c_h+1);	// ll 
+		translate([max+1+1.5,    -5+3.5, 0]) 	cylinder(d=3,h=c_h+1);	// lr
+		translate([     -1.5, max+1+1.5, 0]) 	cylinder(d=3,h=c_h+1);	// ul
+		translate([max+1+1.5, max+1+1.5, 0])	cylinder(d=3,h=c_h+1);	// ur 
 		
-		translate([-1.5,-1.5,0]) 			cylinder(d=5.5,h=c_h+28, center=true);	// ll 
-		translate([max+1+1.5,-5+3.5,0]) 	cylinder(d=5.5,h=c_h+28, center=true);	// lr
-		translate([-1.5,max+1+1.5,0]) 		cylinder(d=5.5,h=c_h+28, center=true);	// ul
-		translate([max+1+1.5,max+1+1.5,0])	cylinder(d=5.5,h=c_h+28, center=true);	// ur 
+		translate([     -1.5,      -1.5, 0]) 	cylinder(d=5.5,h=c_h-screwDeep);	// ll 
+		translate([max+1+1.5,    -5+3.5, 0]) 	cylinder(d=5.5,h=c_h-screwDeep);	// lr
+		translate([     -1.5, max+1+1.5, 0]) 	cylinder(d=5.5,h=c_h-screwDeep);	// ul
+		translate([max+1+1.5, max+1+1.5, 0])	cylinder(d=5.5,h=c_h-screwDeep);	// ur 
         
         // ventilation grill
         tol = 0.2;
-        translate([12,15.5,0])	
+        translate([14,18,0])	
              difference(){
                linear_extrude(height = 10)
                cube([16,30,10]);
-               for (x=[0:4:16]){
-                 for (y=[0:4:32]){
+               for (x=[0:5:15]){
+                 for (y=[0:5:30]){
                    translate([x,y,-tol/2]){
-                     cylinder(r=1.5,h=10+tol,$fn=180);
+                     cylinder(r=2,h=10+tol,$fn=180);
                    }
                  }
                }
              }
             
+        // slots for LED connector
+		#translate([max-12,max-0.5,c_h-9])	cube([12, 4.5, 10]); 	
+		#translate([1,0-3,c_h-9])	cube([12, 4.5, 10]);
             
-		// FTDI cutout
-		//#translate([18+6+5+6,-5,15])	cube([19, 8, 8]); 	// bottom
-
-		// Time Adjust Button Holes
-        /*
-		translate([18+30+5+5,10+12.5+1.5,0])	cylinder(d=5,h=5);
-		translate([18+30+20,10+12+1.5,.2]) 	rotate([0,180,0])
-			linear_extrude(height = 0.2)
-					text(
-						"+M", 
-						font = f,
-						size=6, 
-						$fn=20, 
-						valign="center", 
-						halign = "center"
-					);
-        
-		translate([18+30+5+5,10+30+1.5,0])	cylinder(d=5,h=5);
-		translate([18+30+20,10+30+1.5,.2])	rotate([0,180,0])
-					linear_extrude(height = 0.2)
-					text(
-						"+H", 
-						font = f,
-						size=6, 
-						$fn=20, 
-						valign="center", 
-						halign = "center"
-					);
-		*/
-
 		// power socket cutout
-		translate([4,(max/2),0])
-			 cylinder(d=8,h=6, center=true);
+		translate([5,(max/2),0])
+			 cylinder(d=9,h=6, center=true);
 		
-		/*translate([12,26,0.2]) rotate([0,180,0])
-					linear_extrude(height = 0.2)
+        // brand
+		translate([max/2+15,max/2,0.3]) rotate([180,0,90])
+					linear_extrude(height = 0.3)
 					text(
-						"+5vdc", 
-						font = f,
+						"Word-Clock", 
+						font = font_brand,
 						size=6, 
 						$fn=20, 
 						valign="center", 
 						halign = "center"
-					);*/
+					);
 	}
     
-	// standoffs for AC-DC
-	translate([5+5+9, 8    , 2]) 	standoff();
-	translate([5+5+9, 8 +50, 2]) 	standoff();
-	
-	// standoffs for ESP 
-	translate([5+5+28    , 6    , 2]) 	standoff();
-	translate([5+5+28    , 6 +52, 2]) 	standoff();
-	translate([5+5+28 +25, 6    , 2])	standoff();
-	translate([5+5+28 +25, 6 +52, 2]) 	standoff();
-    
     // debug modules
-    //#translate([6, 13, 8])	cube([28, 40, 23]); 	// AC-DC
-    //#translate([35, 3, 7])	cube([31, 60, 23]); 	// ESP
-}
+    //#translate([6, 13, 3])	cube([28, 40, 23]); 	// AC-DC
+    //#translate([35, 3, 5])	cube([31, 60, 18]); 	// ESP
+    
+    // strandoffs
+    width_bottom = 8;
+    width_top = 8;
+    
+	// standoffs for AC-DC
+    acdc_height = 24;
+    acdc_length = 50;
+    acdc_x = 5+5+9;
+    acdc_y = 8;
+	translate([acdc_x, acdc_y             , 2]) standoff(acdc_height, width_bottom, width_top);
+	translate([acdc_x, acdc_y+acdc_length , 2]) standoff(acdc_height, width_bottom, width_top);
+    
+	// standoffs for ESP 
+    esp_height = 21;
+    esp_width = 25;
+    esp_length = 52;
+    esp_x = 5+5+28;
+    esp_y = 6;
+	translate([esp_x          , esp_y             , 2]) standoff(esp_height, width_bottom, width_top);
+	translate([esp_x+esp_width, esp_y             , 2]) standoff(esp_height, width_bottom, width_top);
+	translate([esp_x          , esp_y+esp_length  , 2]) standoff(esp_height, width_bottom, width_top);
+	translate([esp_x+esp_width, esp_y+esp_length  , 2]) standoff(esp_height, width_bottom, width_top);
+    
+    // aditional supports for AC-DC
+	#translate([acdc_x-(width_top/2), 0    , 2])    cube([8,8,14]); //OK
+	#translate([acdc_x-(width_top/2), max-9, 2]) 	cube([8,9,14]); //OK
 
-module dot_pattern(size, line_size, line_space) {
-    rad = line_space / 2;
-    y_offset = sqrt((rad + line_size / 2) * (rad + line_size / 2) * 4 - (rad + line_size / 2) * (rad + line_size / 2));
-    num_x = ceil(size / rad / 2) * 1.42;
-    num_y = ceil(size / y_offset) * 1.42;
-    difference() {
-        square([size * 1.42, size * 1.42], center = true);
-        for(y = [floor(-num_y / 2) : ceil(num_y / 2)]) {
-            odd = (y % 2 == 0) ? 0 : rad + line_size / 2;
-            for(x = [floor(-num_x / 2) : ceil(num_x / 2)]) {
-                translate([x * (rad + line_size / 2) * 2 + odd, y * y_offset]) {
-                    rotate(30) {
-                        circle(d=line_space);
-                    }
-                }
-            }
-        }
-    }
+    // aditional supports for ESP 
+	#translate([esp_x-(width_top/2),     0, 2])    cube([8,7,12]); //OK
+	#translate([esp_x-(width_top/2), max-9, 2])    cube([8,9,12]); //OK
+    
+	#translate([esp_x-(width_top/2)+esp_width    , 0, 2])   cube([9,4.5,21]);
+	#translate([esp_x-(width_top/2)+esp_width+5.5, 0, 2]) 	cube([4,8,21]);
+    
+	#translate([esp_x-(width_top/2)+esp_width    , esp_y+esp_length+1.5, 2]) cube([9,8,21]);
+	#translate([esp_x-(width_top/2)+esp_width+5.5, esp_y+esp_length-3  , 2]) cube([4,5,21]);
 }
-
 
 // uncomment for clock face
-translate([-15,0,10]) rotate([0,180,0]) clock_face();
+//translate([-15,0,10]) rotate([0,180,0]) clock_face();
 
 // uncomment for led diffusers
 //translate([0,-80,0]) diffusers();
 
 // uncomment for back of case
-//case_back();
+case_back();
 
