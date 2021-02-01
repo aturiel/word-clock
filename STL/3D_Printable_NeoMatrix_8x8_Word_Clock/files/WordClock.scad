@@ -154,19 +154,17 @@ module case_back()
         
         // ventilation grill
         tol = 0.2;
-        translate([14,18,0])	
+        translate([14,16.5,0])	
              difference(){
                linear_extrude(height = 10)
                cube([16,30,10]);
-               for (x=[0:5:15]){
-                 for (y=[0:5:30]){
-                   translate([x,y,-tol/2]){
-                     cylinder(r=2,h=10+tol,$fn=180);
+               for (y=[0:6:30]){
+                   translate([0,y,0]){
+                     cube([20,3,5]);
                    }
-                 }
                }
              }
-            
+        
         // slots for LED connector
         led_connector_deep = 9;
 		#translate([max-12, max-0.5, c_h-led_connector_deep])	cube([12, 4.5, led_connector_deep]); 	
@@ -177,6 +175,7 @@ module case_back()
 			 cylinder(d=9,h=6, center=true);
 		
         // brand
+        /*
 		translate([max/2+15,max/2,0.3]) rotate([180,0,90])
 					linear_extrude(height = 0.3)
 					text(
@@ -187,6 +186,7 @@ module case_back()
 						valign="center", 
 						halign = "center"
 					);
+        */
 	}
     
     // debug modules
