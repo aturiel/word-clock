@@ -91,7 +91,7 @@ int externalLight = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the We
 #define LED_COUNT  64
 
 // NeoPixel brightness, 0 (min) to 255 (max)
-#define BRIGHTNESS 50 // Set BRIGHTNESS to about 1/5 (max = 255)
+#define BRIGHTNESS 36 // Set BRIGHTNESS to about 1/7 (max = 255)
 
 // NeoPixel library
 Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -857,7 +857,7 @@ void displayWordTime() {
     wordClockSimulated += "<div class='word-clock-row'>";
     for (int8_t col = 0; col < TOTAL_COLS; ++col) {
       if (display[row][col] == 1) {
-        int ledColor = Wheel(calculateMagicNumber(row, col, rnd), red, green, blue);
+        int ledColor = ClockWheel(calculateMagicNumber(row, col, rnd), red, green, blue);
         leds.setPixelColor(row * TOTAL_COLS + col, ledColor);
         wordClockSimulated += "<span class='letter selected' style='color:" + htmlColor(red, green, blue) + "'>" + String(text[row][col]) + "</span>";
       } else {
@@ -911,14 +911,8 @@ void ledsIntro() {
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  int red, green, blue;
-  return Wheel(WheelPos, red, green, blue);
-}
-
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos, int &red, int &green, int &blue) {
+// reduced brightness from defaut Wheel function
+uint32_t ClockWheel(byte WheelPos, int &red, int &green, int &blue) {
   WheelPos = 255 - WheelPos;
   if (WheelPos < 85) {
     red = 255 - WheelPos * 3;
@@ -935,7 +929,9 @@ uint32_t Wheel(byte WheelPos, int &red, int &green, int &blue) {
     green = 255 - WheelPos * 3;
     blue = 0;
   }
-  return leds.Color(red, green, blue);
+
+  // dim leds colors but keep web ones 
+  return leds.Color(red/3, green/3, blue/3);
 }
 
 void rainbowWhell(uint8_t wait) {
@@ -948,6 +944,22 @@ void rainbowWhell(uint8_t wait) {
     delay(wait);
   }
 }
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if (WheelPos < 85) {
+    return leds.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else if (WheelPos < 170) {
+    WheelPos -= 85;
+    return leds.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  } else {
+    WheelPos -= 170;
+    return leds.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  }
+}
+
 
 // Some functions of our own for creating animated effects -----------------
 void testLeds() {
