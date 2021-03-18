@@ -1,4 +1,4 @@
-# WordClock
+# WordClock in spanish
 
 ![](img.jpg)
 https://www.thingiverse.com/thing:4746782
