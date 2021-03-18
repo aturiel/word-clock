@@ -1,5 +1,8 @@
 # WordClock
 
+![](img.jpg)
+https://www.thingiverse.com/thing:4746782
+
 ## Features include:
 * Accurate Clock refresh off Internet Time Servers
 * Configured through Web Interface
