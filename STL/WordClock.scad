@@ -95,7 +95,7 @@ module diffusers()
 		translate([1,1,0]) cube([max,max,diffusers_height]);
 		dividers(1.8);
 	}	
-    translate([1,1,diffusers_height]) cube([max,max,0.30]);
+    //translate([1,1,diffusers_height]) cube([max,max,0.30]);
 }
 
 module standoff( height, width_bottom, width_top)
@@ -229,8 +229,8 @@ module case_back()
 //translate([-15,0,10]) rotate([0,180,0]) clock_face();
 
 // uncomment for led diffusers
-//translate([0,-80,0]) diffusers();
+translate([0,-80,0]) diffusers();
 
 // uncomment for back of case
-case_back();
+//case_back();
 
