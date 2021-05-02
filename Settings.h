@@ -49,7 +49,6 @@ SOFTWARE.
 // Start Settings
 //******************************
 
-//String TIMEDBKEY = "EWSHE36AKUNX";    // Your API Key from https://timezonedb.com/register
 const int WEBSERVER_PORT = 80;          // The port you can access this device on over HTTP
 const boolean WEBSERVER_ENABLED = true; // Device will provide a web interface via http://[ip]:[port]/
 boolean IS_BASIC_AUTH = false;          // Use Basic Authorization for Configuration security on Web Interface
