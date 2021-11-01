@@ -38,7 +38,7 @@ int8_t getWifiQuality();
 // Define NTP Client to get time
 // automatic summer time => https://github.com/RoboUlbricht/arduinoslovakia/blob/master/esp8266/ntp_client/ntp_client.ino
 WiFiUDP ntpUDP;
-long utcOffsetInSeconds = 3600 * 2;
+long utcOffsetInSeconds = 3600 * 1;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
 // HTML to simulate word-clock
@@ -1129,4 +1129,3 @@ void startupChime() {
     beep(cH, 150);
     beep(a, 650);
 }
-
