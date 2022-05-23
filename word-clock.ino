@@ -38,8 +38,10 @@ int8_t getWifiQuality();
 // Define NTP Client to get time
 // automatic summer time => https://github.com/RoboUlbricht/arduinoslovakia/blob/master/esp8266/ntp_client/ntp_client.ino
 WiFiUDP ntpUDP;
-long utcOffsetInSeconds = 3600 * 1;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+// now we have a setting in the config
+//long utcOffsetInSeconds = 3600 * 2;
+//NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 // HTML to simulate word-clock
 String wordClockSimulated = "";
@@ -74,6 +76,7 @@ static const char CHANGE_FORM[] PROGMEM = "<form class='w3-container' action='/s
     "<p><label>Display ON Time (24 Hour Format HH:MM -- Leave blank for always on)</label><input class='w3-input w3-border w3-margin-bottom' name='startTime' type='time' value='%STARTTIME%'></p>"
     "<hr>"
     "<h3>Miscellaneous</h3>"
+    "<p><label>UTC ofsset (in seconds)</label><input class='w3-input w3-border w3-margin-bottom' name='utcOffset' value='%UTC_OFFSET%'></p>"
     "<p><input name='isRainbowHour' class='w3-check w3-margin-top' type='checkbox' %IS_RAINBOW_HOUR_CHECKED%> Display rainbow animation on the hour</p>"    
     "<p><input name='isColorsPerMinute' class='w3-check w3-margin-top' type='checkbox' %IS_COLORS_PER_MINUTE%> Update colors every minute</p>"
     "<p><input name='isBuzzerEnabled' class='w3-check w3-margin-top' type='checkbox' %IS_BUZZER_ENABLED%> Buzzer active</p>"
@@ -332,6 +335,11 @@ void loadConfig() {
       timeDisplayTurnsOff.trim();
       Serial.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
     }
+    if (line.indexOf("utcOffset=") >= 0) {
+      utcOffset = line.substring(line.lastIndexOf("utcOffset=") + 10).toInt();
+      Serial.println("utcOffset=" + String(utcOffset));
+      timeClient.setTimeOffset(utcOffset);
+    }
     if (line.indexOf("isRainbowHour=") >= 0) {
       isRainbowHour = line.substring(line.lastIndexOf("isRainbowHour=") + 14).toInt();
       Serial.println("isRainbowHour=" + String(isRainbowHour));
@@ -373,6 +381,7 @@ void saveConfig() {
     Serial.println("Saving settings now...");
     f.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
     f.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
+    f.println("utcOffset=" + String(utcOffset));
     f.println("isRainbowHour=" + String(isRainbowHour));
     f.println("isColorsPerMinute=" + String(isColorsPerMinute));
     f.println("isBuzzerEnabled=" + String(isBuzzerEnabled));
@@ -391,6 +400,8 @@ void processConfig() {
   
   timeDisplayTurnsOn = decodeHtmlString(server.arg("startTime"));
   timeDisplayTurnsOff = decodeHtmlString(server.arg("endTime"));
+
+  utcOffset = decodeHtmlString(server.arg("utcOffset")).toInt();
   
   isRainbowHour = server.hasArg("isRainbowHour");
   isColorsPerMinute = server.hasArg("isColorsPerMinute");
@@ -504,6 +515,8 @@ void handleConfigure() {
   // Time Display on/off
   form.replace("%STARTTIME%", timeDisplayTurnsOn);
   form.replace("%ENDTIME%", timeDisplayTurnsOff);
+
+  form.replace("%UTC_OFFSET%", String(utcOffset));
 
   tmpChecked = "";
   if (isRainbowHour) {
